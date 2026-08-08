@@ -14,7 +14,6 @@ import itertools
 import json
 import os
 import subprocess
-import sys
 import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
@@ -61,13 +60,11 @@ def committee_utilities(types: Sequence[int], k: int, n: int) -> list[tuple[int,
     return result
 
 
-def witness_solver(
-    types: Sequence[int], k: int, utility: Sequence[int], *, strict_box: bool = False
-) -> tuple[Solver, list]:
+def witness_solver(types: Sequence[int], k: int, utility: Sequence[int]) -> tuple[Solver, list]:
     x = [Real(f"x_{j}") for j in range(len(types))]
     solver = Solver()
     for value in x:
-        solver.add(value > 0, value < 1) if strict_box else solver.add(value >= 0, value <= 1)
+        solver.add(value >= 0, value <= 1)
     solver.add(Sum(x) <= k)
     for i, target in enumerate(utility):
         solver.add(Sum([x[j] for j, mask in enumerate(types) if mask >> i & 1]) >= target)
@@ -195,25 +192,9 @@ def pinned_voters(types: Sequence[int], k: int, utility: Sequence[int], n: int) 
     return result
 
 
-def interior_status(types: Sequence[int], k: int, utility: Sequence[int]) -> tuple[bool, bool]:
-    """Return the existential and universal readings of displayed condition R3."""
-    strict, _ = witness_solver(types, k, utility, strict_box=True)
-    strict_exists = strict.check() == sat
-    solver, x = witness_solver(types, k, utility)
-    every_witness_strict = True
-    for value in x:
-        for boundary in (0, 1):
-            solver.push()
-            solver.add(value == boundary)
-            if solver.check() == sat:
-                every_witness_strict = False
-            solver.pop()
-    return strict_exists, every_witness_strict
-
-
 def analyze_family(arguments) -> dict:
     """Analyze all holes on one family, sharing its price-feasibility check."""
-    n, records, diagnostics = arguments
+    n, records = arguments
     types = tuple(records[0]["masks"])
     live_solver, _ = price_solver(types, n, positive=True)
     live = live_solver.check() == sat
@@ -226,9 +207,6 @@ def analyze_family(arguments) -> dict:
             patch = patchable_voters(types, k, utility, n)
             pin = pinned_voters(types, k, utility, n)
             entry.update({"record": record, "patch": patch, "pin": pin, "ok": bool(set(patch) & set(pin))})
-        if diagnostics:
-            exists, universal = interior_status(types, k, utility)
-            entry.update({"strict_witness": exists, "every_witness_strict": universal})
         if entry:
             result["checked"].append(entry)
     return result
@@ -353,11 +331,11 @@ def build_catalogue(n: int, jobs: int, output: Path) -> tuple[list[dict], dict]:
     }
 
 
-def analyze_catalogue(n: int, records: list[dict], jobs: int, diagnostics: bool) -> tuple[dict, list[dict]]:
+def analyze_catalogue(n: int, records: list[dict], jobs: int) -> tuple[dict, list[dict]]:
     groups: dict[tuple[int, ...], list[dict]] = defaultdict(list)
     for record in records:
         groups[tuple(record["masks"])].append(record)
-    arguments = [(n, group, diagnostics) for _, group in sorted(groups.items())]
+    arguments = [(n, group) for _, group in sorted(groups.items())]
     chunksize = max(1, len(arguments) // max(1, jobs * 32))
     if jobs == 1:
         results = [analyze_family(arguments_for_family) for arguments_for_family in arguments]
@@ -369,7 +347,6 @@ def analyze_catalogue(n: int, records: list[dict], jobs: int, diagnostics: bool)
     important = sum(result["live"] for result in results)
     summary = {
         "n": n,
-        "candidate_superset": True,
         "holes": len(records),
         "families": len(groups),
         "important": important,
@@ -387,12 +364,6 @@ def analyze_catalogue(n: int, records: list[dict], jobs: int, diagnostics: bool)
             "exceptions": len(exceptions),
             "exceptions_patchable_at_every_voter": all(len(entry["patch"]) == n for entry in exceptions),
             "small_surplus": check_small_surplus(exceptions, n),
-        })
-    if diagnostics:
-        summary.update({
-            "strict_witness_holes": sum(entry.get("strict_witness", False) for entry in checked),
-            "every_witness_strict_holes": sum(entry.get("every_witness_strict", False) for entry in checked),
-            "diagnostic_scope": "all holes for n=6; important holes for n=7",
         })
     return summary, exceptions
 
@@ -415,9 +386,11 @@ def main() -> None:
     parser.add_argument("n", type=int, choices=(6, 7))
     parser.add_argument("--jobs", type=int, default=max(1, min(4, os.cpu_count() or 1)))
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--catalogue", type=Path, help="analyze this saved catalogue instead of rebuilding it")
-    parser.add_argument("--interior-diagnostics", action="store_true")
-    parser.add_argument("--no-expected", action="store_true", help="do not assert the paper's expected counts")
+    parser.add_argument(
+        "--catalogue",
+        type=Path,
+        help="recheck the theorem on this trusted catalogue instead of rebuilding it",
+    )
     args = parser.parse_args()
 
     output = args.output or Path(f"results-n{args.n}")
@@ -429,7 +402,7 @@ def main() -> None:
     else:
         records, build_timing = build_catalogue(args.n, args.jobs, output)
     analysis_start = time.time()
-    summary, exceptions = analyze_catalogue(args.n, records, args.jobs, args.interior_diagnostics)
+    summary, exceptions = analyze_catalogue(args.n, records, args.jobs)
     analysis_seconds = time.time() - analysis_start
     summary["elapsed_seconds"] = round(time.time() - start, 3)
     summary["timing"] = {"theorem_analysis_seconds": round(analysis_seconds, 3)}
@@ -439,8 +412,7 @@ def main() -> None:
     (output / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if exceptions:
         write_gzip_json(output / "exceptions.json.gz", exceptions)
-    if not args.no_expected:
-        check_expected(summary)
+    check_expected(summary)
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 

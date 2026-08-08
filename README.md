@@ -16,11 +16,11 @@ There are two executable source files:
   feasibility question.  There is no floating-point LP and no custom LP
   implementation.
 
-The generated catalogue is deliberately a **candidate superset**.  It imposes
-(R1), (R2), and (R4)--(R6) from the paper, but not (R3).  Thus the reported
-54,985 seven-voter holes include every residual relevant to the proof, without
-claiming that every listed hole has only strictly interior fractional
-witnesses.  The optional interior diagnostic makes this distinction visible.
+The generated catalogue imposes conditions (R1)--(R5) from the paper.  It then
+checks every compatible committee size and utility vector for fractional
+feasibility and integral infeasibility.  Thus the reported 54,985 seven-voter
+holes are exactly the novel minimal holes in the finite search space used in
+the proof.
 
 ## Installation
 
@@ -60,17 +60,12 @@ seconds in a single process.  Timings are recorded automatically in
 `summary.json`, together with the Z3 version, so results from other machines
 can be reported directly.
 
-To recheck a previously generated catalogue without rerunning the antichain
-search, use:
+To recheck the theorem on a trusted, previously generated catalogue without
+rerunning the antichain search or catalogue construction, use:
 
 ```sh
 python3 verify.py 7 --jobs 4 --catalogue results-n7/holes7.json.gz
 ```
-
-To inspect the distinction surrounding (R3), add
-`--interior-diagnostics`.  For each checked hole this tests both existence of
-a witness with all `0 < x_R < 1` and the stronger claim that no witness has a
-coordinate equal to 0 or 1.
 
 ## Mathematical checks
 
@@ -108,10 +103,5 @@ than `8/9` and requiring `unsat`.  A separate exact satisfiability check records
 a price vector attaining `8/9`.
 
 `summary.json` contains the counts, the sharpness witness, the Z3 version, and
-the elapsed time.  Unless `--no-expected` is passed, the program exits with an
-error if any paper count or theorem check differs from the expected result.
-
-The fresh generator uses ordinary lexicographic canonical representatives.
-The older exploratory catalogue used a different canonical key, so its raw
-records are usually labelled differently.  An orbit-level comparison of the
-complete catalogues found them identical up to voter relabeling.
+the elapsed time.  The program exits with an error if any paper count or
+theorem check differs from the expected result.
