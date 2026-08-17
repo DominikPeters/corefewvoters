@@ -1,0 +1,66 @@
+{
+  "candidate_superset": true,
+  "elapsed_seconds": 9227.166,
+  "exceptions": 298,
+  "exceptions_patchable_at_every_voter": true,
+  "families": 10292,
+  "holes": 54985,
+  "important": 21818,
+  "n": 7,
+  "pinned_patchable": 21520,
+  "small_surplus": {
+    "attained": true,
+    "bound": "8/9",
+    "witness": {
+      "beta": [
+        "7/9",
+        "2/9",
+        "2/9",
+        "2/9",
+        "1/3",
+        "1/3",
+        "1/3"
+      ],
+      "record": {
+        "k": 4,
+        "masks": [
+          3,
+          5,
+          9,
+          30,
+          46,
+          78,
+          112
+        ],
+        "types": [
+          "1100000",
+          "1010000",
+          "1001000",
+          "0111100",
+          "0111010",
+          "0111001",
+          "0000111"
+        ],
+        "u": [
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1
+        ]
+      },
+      "value": "8/9",
+      "voter": 1
+    }
+  },
+  "timing": {
+    "antichain_enumeration_seconds": 77.796,
+    "candidate_antichains": 228853,
+    "catalogue_total_seconds": 9204.194,
+    "hole_verification_seconds": 9126.392,
+    "theorem_analysis_seconds": 22.938
+  },
+  "z3_version": "4.16.0"
+}
