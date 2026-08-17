@@ -6,21 +6,19 @@ This directory contains the scripts for performing the computational verificatio
 Note that the code and the following readme was written by LLMs.
 We plan to make more thoroughly checked versions available in due course.
 
-There are two executable source files:
+The main file is `reproduce.ipynb`, an executable
+Jupyter notebook that develops the reproduction from the mathematical setup
+through the final fact checks. It includes explanatory text, LaTeX,
+worked examples, sample catalogue records, and recorded output from a complete
+six-voter run.
 
-- `enumerate_antichains.c` performs only the expensive combinatorial search
-  for candidate type families, including canonicalization under voter
-  relabeling;
-- `verify.py` treats both `n=6` and `n=7`.  It enumerates integral committees
-  directly and uses Z3's exact rational arithmetic for every continuous
-  feasibility question.  There is no floating-point LP and no custom LP
-  implementation.
+The accompanying `enumerate_antichains.c` program performs the expensive
+purely combinatorial search for candidate type families, including
+canonicalization under voter relabeling.  The notebook compiles and invokes it
+when rebuilding a catalogue.
 
-The generated catalogue imposes conditions (R1)--(R5) from the paper.  It then
-checks every compatible committee size and utility vector for fractional
-feasibility and integral infeasibility.  Thus the reported 54,985 seven-voter
-holes are exactly the novel minimal holes in the finite search space used in
-the proof.
+All continuous feasibility questions use Z3's exact rational arithmetic.
+Integral committees are enumerated directly.  There is no floating-point LP.
 
 ## Installation
 
@@ -32,76 +30,81 @@ python3 -m venv .venv
 python3 -m pip install -r requirements.txt
 ```
 
-## Full reproduction
+## Reading and running the notebook
 
-Run from this directory:
+Start Jupyter from this directory:
 
 ```sh
-python3 verify.py 6 --jobs 4
-python3 verify.py 7 --jobs 4
+jupyter lab reproduce.ipynb
 ```
 
-The program compiles the C helper, regenerates the candidate antichains,
-constructs `holes6.json.gz` or `holes7.json.gz`, and checks the corresponding
-theorem.  Outputs go to `results-n6/` and `results-n7/` by default.
+Read and run the cells from top to bottom.  The configuration cell near the
+top controls:
 
-The six-voter run is quick.  The seven-voter run is dominated by exhaustive
-catalogue construction and is expected to take substantially longer.
+- `N`, which is either 6 or 7;
+- `JOBS`, the number of parallel workers;
+- `REBUILD_CATALOGUE`, which selects a full rebuild or a fact-property recheck
+  of the bundled precomputed catalogue; and
+- `OUTPUT`, the result directory.
 
-For reference, a complete four-worker `n=7` run on an Apple M1 Pro MacBook Pro
-(8 cores, 16 GB RAM), using Z3 4.16.0, took 9,227 seconds (2 h 33 min 47 s):
+The defaults perform a complete six-voter reproduction and write to
+`notebook-results-n6/`.  For the complete seven-voter reproduction, set `N=7`
+and leave `REBUILD_CATALOGUE=True`.
+
+The same configuration is available through environment variables for
+headless execution.  For example:
+
+```sh
+CORE67_N=6 CORE67_REBUILD=1 jupyter nbconvert \
+  --to notebook --execute --inplace reproduce.ipynb
+
+CORE67_N=7 CORE67_REBUILD=1 jupyter nbconvert \
+  --to notebook --execute --inplace reproduce.ipynb \
+  --ExecutePreprocessor.timeout=20000
+```
+
+The seven-voter run is dominated by catalogue construction.  A complete
+four-worker run on an Apple M1 Pro MacBook Pro (8 cores, 16 GB RAM), using Z3
+4.16.0, took 9,227 seconds (2 h 33 min 47 s):
 
 - antichain enumeration: 77.8 seconds for 228,853 canonical candidates;
 - exact candidate-to-hole verification: 9,126.4 seconds;
-- post-catalogue theorem verification: 22.9 seconds.
+- post-catalogue fact verification: 22.9 seconds.
 
-The same theorem verification starting from the saved catalogue took about 92
-seconds in a single process.  Timings are recorded automatically in
-`summary.json`, together with the Z3 version, so results from other machines
-can be reported directly.
-
-To recheck the theorem on a trusted, previously generated catalogue without
-rerunning the antichain search or catalogue construction, use:
+To perform only the fact-property checks on the bundled precomputed seven-voter
+catalogue, use:
 
 ```sh
-python3 verify.py 7 --jobs 4 --catalogue results-n7/holes7.json.gz
+CORE67_N=7 CORE67_REBUILD=0 jupyter nbconvert \
+  --to notebook --execute --inplace reproduce.ipynb \
+  --ExecutePreprocessor.timeout=1000
 ```
 
-## Mathematical checks
+This shortcut does not reproduce the antichain enumeration or catalogue
+construction. It checks condition (R7), the two classes in the seven-voter
+fact, and the exact `8/9` bound on the saved 54,985-hole catalogue.
 
-For a candidate family `F`, committee size `k`, and integer utility vector
-`u`, catalogue membership means:
+## What is checked
 
-1. no integral committee of size `k` weakly dominates `u`; and
-2. Z3 finds rational values `x_R` satisfying
-   `0 <= x_R <= 1`, `sum(x_R) <= k`, and
-   `sum(R contains i) x_R >= u_i` for every voter `i`.
+The generated catalogue imposes conditions (R1)--(R6) from the paper and then
+checks every compatible committee size and utility vector for fractional
+feasibility and integral infeasibility. Thus the reported 54,985 seven-voter
+holes are exactly the candidate minimal holes in the finite search space used
+in the proof.
 
-It suffices to enumerate committees of exactly size `k`: a smaller committee
-can be padded with unused candidates without decreasing any utility.
+For six voters, the notebook checks that there are 50 holes on 23 antichain
+families. For every voter `i` in every hole, it checks that every fractional
+witness gives utility exactly `u_i` and that `u-e_i` is integrally feasible.
 
-For the six-voter theorem, for every one of the 50 holes and every voter `i`,
-the script checks:
-
-- `u-e_i` is integrally feasible by exhaustive committee enumeration;
-- the witness constraints together with `u_i(x) > u_i` are unsatisfiable.
-  Hence every fractional witness gives voter `i` exactly the integer utility
-  `u_i`.
-
-For seven voters, a hole is called important when Z3 finds strictly positive
-`beta_i` with `sum(i in R) beta_i = 1` for every `R` in `F`.  On all important
-holes the script computes the patchable and pinned voters as above.  It checks
-the expected split into 21,520 pinned-and-patchable holes and 298 exceptions.
-For every exceptional hole and every voter `i`, it then proves
+For seven voters, it checks that 21,818 of the 54,985 holes satisfy the
+Lindahl-compatibility condition (R7). It checks that 21,520 belong to class
+(1) of the fact and that the remaining 298 belong to class (2). For every
+class (2) hole and voter, it checks that `u-e_i` is integrally feasible and
+proves over the closed beta polytope that
 
 ```text
 beta_i + k - sum_j u_j beta_j <= 8/9
 ```
 
-over the closed price polytope by asking Z3 for a solution with value greater
-than `8/9` and requiring `unsat`.  A separate exact satisfiability check records
-a price vector attaining `8/9`.
-
-`summary.json` contains the counts, the sharpness witness, the Z3 version, and
-the elapsed time.  The program exits with an error if any paper count or
-theorem check differs from the expected result.
+The notebook always exits with an error if a paper count or fact-property
+check differs from the expected result.
