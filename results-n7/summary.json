@@ -1,14 +1,13 @@
 {
-  "candidate_superset": true,
   "elapsed_seconds": 9227.166,
-  "exceptions": 298,
-  "exceptions_patchable_at_every_voter": true,
+  "class_2": 298,
+  "class_2_reducible_at_every_voter": true,
   "families": 10292,
   "holes": 54985,
-  "important": 21818,
+  "lindahl_compatible": 21818,
   "n": 7,
-  "pinned_patchable": 21520,
-  "small_surplus": {
+  "class_1": 21520,
+  "class_2_bound": {
     "attained": true,
     "bound": "8/9",
     "witness": {
@@ -60,7 +59,7 @@
     "candidate_antichains": 228853,
     "catalogue_total_seconds": 9204.194,
     "hole_verification_seconds": 9126.392,
-    "theorem_analysis_seconds": 22.938
+    "fact_check_seconds": 22.938
   },
   "z3_version": "4.16.0"
 }
